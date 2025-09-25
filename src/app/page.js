@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 async function createNote({ title, content }) {
     const res = await fetch('api/notes', {
@@ -33,6 +33,8 @@ export default function Home() {
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [openModal, setOpenModal] = useState(false);
+    const [selected, setSelected] = useState(null);
 
     const { mutateAsync: addNote, isPending: isSaving } = useMutation({
         mutationFn: createNote,
@@ -60,10 +62,41 @@ export default function Home() {
         queryFn: fetchNotes,
     });
 
+    function openNotes(it) {
+        setSelected(it);
+        setOpenModal(true);
+    }
+
+    function closeNotes() {
+        setSelected(null);
+        setOpenModal(false);
+    }
+
+    useEffect(() => {
+        if (!openModal) return;
+
+        // tidak bisa discroll
+        const original = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        // tutup dengan ESC
+        const onKey = (e) => {
+            if (e.key === 'Escape') {
+                closeNotes();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+
+        return () => {
+            document.body.style.overflow = original;
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [openModal]);
+
     return (
         <main className="font-sans max-w-3xl mx-auto p-6">
             <h1 className="mb-4 font-semibold text-xl font-pixel">
-                Knowledge Notes
+                KNOWLEDGE NOTES
             </h1>
 
             <form className="space-y-4" onSubmit={onSubmit}>
@@ -76,7 +109,7 @@ export default function Home() {
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder=" "
                         className={[
-                            'peer w-full rounded-md border border-gray-300 bg-white p-3',
+                            'text-sm peer w-full rounded-md border border-gray-300 bg-white p-3',
                             'outline-none',
                             'transition-all duration-300',
                             'focus:border-blue-400 focus:ring-4 focus:ring-blue-100 focus:shadow-md',
@@ -107,7 +140,7 @@ export default function Home() {
                         onChange={(e) => setContent(e.target.value)}
                         placeholder=" "
                         className={[
-                            'peer w-full rounded-md border border-gray-300 bg-white p-3',
+                            'text-sm peer w-full rounded-md border border-gray-300 bg-white p-3',
                             'outline-none',
                             'transition-all duration-300',
                             'min-h-[150px] resize-y',
@@ -134,7 +167,7 @@ export default function Home() {
                     <button
                         type="submit"
                         disabled={isSaving}
-                        className="border border-gray-300 rounded-md px-4 py-2 inline-flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-60"
+                        className="text-sm border border-gray-300 rounded-md px-4 py-2 inline-flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:opacity-60"
                     >
                         {isSaving ? 'menyimpan...' : 'Tambahkan'}
                     </button>
@@ -142,7 +175,7 @@ export default function Home() {
             </form>
             <section className="mt-4">
                 <h2 className="mb-3 font-semibold text-xl font-pixel">
-                    Daftar Catatan
+                    DAFTAR CATATAN
                 </h2>
 
                 {isLoading && (
@@ -157,6 +190,64 @@ export default function Home() {
                     </p>
                 )}
 
+                {/* MODAL NOTES */}
+                {openModal && selected && (
+                    <div
+                        aria-modal="true"
+                        role="dialog"
+                        aria-labelledby="note-title"
+                        className={[
+                            'fixed inset-0 z-50 flex items-center justify-center',
+                            'bg-black/40 backdrop-blur-sm',
+                        ].join(' ')}
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) {
+                                closeNotes();
+                            }
+                        }}
+                    >
+                        {/* Modal Card */}
+                        <div
+                            className={[
+                                'bg-white max-w-lg rounded-md border border-gray-300',
+                                'shadow-md p-5',
+                            ].join(' ')}
+                            role="document"
+                        >
+                            <div className="flex justify-between gap-3">
+                                <h3 id="note-title" className='font-semibold'>{selected.title}</h3>
+
+                                <buton
+                                    type="button"
+                                    onClick={() => closeNotes()}
+                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
+                                >
+                                    Esc
+                                </buton>
+                            </div>
+
+                            <div className="mt-4 text-sm text-gray-700 whitespace-pre-line">
+                                {selected.content}
+                            </div>
+
+                            <div className="mt-4 text-xs text-gray-400">
+                                {selected.created_at &&
+                                    `Dibuat: ${new Date(
+                                        selected.created_at
+                                    ).toLocaleString('id-ID')}`}
+                                {selected.updated_at && (
+                                    <div className='italic text-gray-300'>
+                                        Diperbarui:{' '}
+                                        {new Date(
+                                            selected.updated_at
+                                        ).toLocaleString('id-ID')}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <ul className="text-sm grid gap-3">
                     {(data ?? []).map((it) => (
                         <li
@@ -167,6 +258,7 @@ export default function Home() {
                                 'hover:-translate-y-1 hover:shadow-md',
                                 'active:translate-y-0',
                             ].join(' ')}
+                            onClick={() => openNotes(it)}
                         >
                             <div className="font-semibold">{it.title}</div>
                             <p className="mt-1 text-[12px] text-gray-700 whitespace-pre-line">
