@@ -215,7 +215,9 @@ export default function Home() {
                             role="document"
                         >
                             <div className="flex justify-between gap-3">
-                                <h3 id="note-title" className='font-semibold'>{selected.title}</h3>
+                                <h3 id="note-title" className="font-semibold">
+                                    {selected.title}
+                                </h3>
 
                                 <buton
                                     type="button"
@@ -230,13 +232,22 @@ export default function Home() {
                                 {selected.content}
                             </div>
 
+                            <div className='flex justify-end'>
+                                <button
+                                    type="button"
+                                    className="mt-4 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
+                                >
+                                    Edit
+                                </button>
+                            </div>
+
                             <div className="mt-4 text-xs text-gray-400">
                                 {selected.created_at &&
                                     `Dibuat: ${new Date(
                                         selected.created_at
                                     ).toLocaleString('id-ID')}`}
                                 {selected.updated_at && (
-                                    <div className='italic text-gray-300'>
+                                    <div className="italic text-gray-300">
                                         Diperbarui:{' '}
                                         {new Date(
                                             selected.updated_at
@@ -265,11 +276,10 @@ export default function Home() {
                                 {it.content}
                             </p>
                             <div className="mt-2 text-xs text-gray-400">
-                                {it.created_at
-                                    ? new Date(it.created_at).toLocaleString(
-                                          'id-ID'
-                                      )
-                                    : ''}
+                                {it.created_at &&
+                                    `Dibuat: ${new Date(
+                                        it.created_at
+                                    ).toLocaleString('id-ID')}`}
                                 {it.updated_at && (
                                     <p className="italic text-gray-300">
                                         diperbarui{' '}
