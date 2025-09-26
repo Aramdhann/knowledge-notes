@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+// Create Catatan
 async function createNote({ title, content }) {
     const res = await fetch('api/notes', {
         method: 'POST',
@@ -17,13 +18,32 @@ async function createNote({ title, content }) {
     return res.json();
 }
 
+// Ambil Catatan
 async function fetchNotes() {
     const res = await fetch('/api/notes', {
         cache: 'no-cache',
     });
 
     if (!res.ok) {
-        throw new Error('Gagal memuat catatan');
+        throw new Error('Gagal memuat catatan!');
+    }
+
+    return res.json();
+}
+
+// Update Catatan
+async function patchNotes({ id, title, content }) {
+    const res = await fetch(`/api/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({
+            title,
+            content,
+        }),
+    });
+
+    if (!res.ok) {
+        throw new Error('Gagal update catatan!');
     }
 
     return res.json();
@@ -36,10 +56,23 @@ export default function Home() {
     const [openModal, setOpenModal] = useState(false);
     const [selected, setSelected] = useState(null);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [editTitle, setEditTitle] = useState('');
+    const [editContent, setEditContent] = useState('');
+
     const { mutateAsync: addNote, isPending: isSaving } = useMutation({
         mutationFn: createNote,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notes'] });
+        },
+    });
+
+    const { mutateAsync: updateNote, isPending: isUpdating } = useMutation({
+        mutationFn: patchNotes,
+        onSuccess: (updated) => {
+            queryClient.invalidateQueries({ queryKey: ['notes'] });
+            setSelected(updated);
+            setIsEditing(false);
         },
     });
 
@@ -57,6 +90,26 @@ export default function Home() {
         setContent('');
     }
 
+    async function onSubmitEdit(e) {
+        e.preventDefault();
+        if (!selected) {
+            return;
+        }
+
+        const titleEdited = editTitle.trim();
+        const contentEdited = editContent.trim();
+
+        if (!titleEdited || !contentEdited) {
+            return;
+        }
+
+        await updateNote({
+            id: selected.id,
+            title: titleEdited,
+            content: contentEdited,
+        });
+    }
+
     const { data, isLoading, isError } = useQuery({
         queryKey: ['notes'],
         queryFn: fetchNotes,
@@ -65,11 +118,13 @@ export default function Home() {
     function openNotes(it) {
         setSelected(it);
         setOpenModal(true);
+        setIsEditing(false);
     }
 
     function closeNotes() {
         setSelected(null);
         setOpenModal(false);
+        setIsEditing(false);
     }
 
     useEffect(() => {
@@ -197,7 +252,7 @@ export default function Home() {
                         role="dialog"
                         aria-labelledby="note-title"
                         className={[
-                            'fixed inset-0 z-50 flex items-center justify-center',
+                            'fixed inset-0 z-50 flex items-center justify-center p-',
                             'bg-black/40 backdrop-blur-sm',
                         ].join(' ')}
                         onClick={(e) => {
@@ -215,50 +270,178 @@ export default function Home() {
                             role="document"
                         >
                             <div className="flex justify-between gap-3">
-                                <h3 id="note-title" className="font-semibold">
-                                    {selected.title}
+                                <h3
+                                    id="note-title"
+                                    className="font-semibold uppercase"
+                                >
+                                    {isEditing
+                                        ? 'Edit Catatan'
+                                        : selected.title}
                                 </h3>
 
-                                <buton
+                                <button
                                     type="button"
                                     onClick={() => closeNotes()}
                                     className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
                                 >
                                     Esc
-                                </buton>
-                            </div>
-
-                            <div className="mt-4 text-sm text-gray-700 whitespace-pre-line">
-                                {selected.content}
-                            </div>
-
-                            <div className='flex justify-end'>
-                                <button
-                                    type="button"
-                                    className="mt-4 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
-                                >
-                                    Edit
                                 </button>
                             </div>
 
-                            <div className="mt-4 text-xs text-gray-400">
-                                {selected.created_at &&
-                                    `Dibuat: ${new Date(
-                                        selected.created_at
-                                    ).toLocaleString('id-ID')}`}
-                                {selected.updated_at && (
-                                    <div className="italic text-gray-300">
-                                        Diperbarui:{' '}
-                                        {new Date(
-                                            selected.updated_at
-                                        ).toLocaleString('id-ID')}
+                            {!isEditing ? (
+                                <>
+                                    <div className="mt-4 text-sm text-gray-700 whitespace-pre-line">
+                                        {selected.content}
                                     </div>
-                                )}
-                            </div>
+
+                                    <div className="flex justify-end">
+                                        <button
+                                            type="button"
+                                            className="mt-4 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
+                                            onClick={() => {
+                                                setIsEditing(true);
+                                                setEditTitle(selected.title);
+                                                setEditContent(
+                                                    selected.content
+                                                );
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-4 text-xs text-gray-400">
+                                        {selected.created_at &&
+                                            `Dibuat: ${new Date(
+                                                selected.created_at
+                                            ).toLocaleString('id-ID')}`}
+                                        {selected.updated_at && (
+                                            <div className="italic text-gray-300">
+                                                Diperbarui:{' '}
+                                                {new Date(
+                                                    selected.updated_at
+                                                ).toLocaleString('id-ID')}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <form
+                                    className="mt-3 space-y-4"
+                                    onSubmit={onSubmitEdit}
+                                >
+                                    <div className="relative">
+                                        <input
+                                            id="edit title"
+                                            name="edit title"
+                                            value={editTitle}
+                                            onChange={(e) =>
+                                                setEditTitle(e.target.value)
+                                            }
+                                            placeholder=" "
+                                            className={[
+                                                'text-sm peer w-full rounded-md border border-gray-300 bg-white p-3',
+                                                'outline-none',
+                                                'transition-all duration-300',
+                                                'focus:border-blue-400 focus:ring-4 focus:ring-blue-100 focus:shadow-md',
+                                            ].join(' ')}
+                                        />
+                                        <label
+                                            htmlFor="edit title"
+                                            className={[
+                                                'pointer-events-none absolute left-3 top-3 text-gray-300',
+                                                'transition-all duration-300',
+                                                // ketika fokus atau ada nilai → label naik & mengecil
+                                                'peer-focus:-top-2 peer-focus:text-xs peer-focus:text-blue-600',
+                                                'peer-placeholder-shown:top-3 peer-placeholder-shown:text-sm',
+                                                'peer-[&:not(:placeholder-shown)]:-top-2 peer-[&:not(:placeholder-shown)]:text-xs',
+                                                // latar kecil agar label terbaca saat naik
+                                                'px-1 bg-white',
+                                            ].join(' ')}
+                                        >
+                                            Title
+                                        </label>
+                                    </div>
+
+                                    <div className="relative">
+                                        <textarea
+                                            id="edit content"
+                                            name="edit content"
+                                            value={editContent}
+                                            onChange={(e) =>
+                                                setEditContent(e.target.value)
+                                            }
+                                            placeholder=" "
+                                            className={[
+                                                'text-sm peer w-full rounded-md border border-gray-300 bg-white p-3',
+                                                'outline-none',
+                                                'transition-all duration-300',
+                                                'min-h-[150px] resize-y',
+                                                'focus:border-blue-400 focus:ring-4 focus:ring-blue-100 focus:shadow-md',
+                                            ].join(' ')}
+                                        />
+
+                                        <label
+                                            htmlFor="edit content"
+                                            className={[
+                                                'pointer-events-none absolute left-3 top-3 text-gray-300',
+                                                'transition-all duration-300',
+                                                'peer-focus:-top-2 peer-focus:text-xs peer-focus:text-blue-600',
+                                                'peer-placeholder-shown:top-3 peer-placeholder-shown:text-sm',
+                                                'peer-[&:not(:placeholder-shown)]:-top-2 peer-[&:not(:placeholder-shown)]:text-xs',
+                                                'px-1 bg-white',
+                                            ].join(' ')}
+                                        >
+                                            Content
+                                        </label>
+                                    </div>
+
+                                    <div className="flex justify-between">
+                                        <button
+                                            type="button"
+                                            className="rounded-md border bg-black text-white border-gray-300 px-2 py-1 text-xs hover:bg-gray-700 active:scale-90 transition duration-300"
+                                            onClick={() => {
+                                                setIsEditing(false);
+                                                setEditTitle(selected.title);
+                                                setEditContent(
+                                                    selected.content
+                                                );
+                                            }}
+                                        >
+                                            Batal
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition duration-300 disabled:opacity-60"
+                                            disabled={isUpdating}
+                                        >
+                                            {isUpdating
+                                                ? 'Menyimpan...'
+                                                : 'Simpan'}
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-4 text-xs text-gray-400">
+                                        {selected.created_at &&
+                                            `Dibuat: ${new Date(
+                                                selected.created_at
+                                            ).toLocaleString('id-ID')}`}
+                                        {selected.updated_at && (
+                                            <div className="italic text-gray-300">
+                                                Diperbarui:{' '}
+                                                {new Date(
+                                                    selected.updated_at
+                                                ).toLocaleString('id-ID')}
+                                            </div>
+                                        )}
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     </div>
                 )}
 
+                {/* LIST NOTES */}
                 <ul className="text-sm grid gap-3">
                     {(data ?? []).map((it) => (
                         <li
@@ -271,7 +454,9 @@ export default function Home() {
                             ].join(' ')}
                             onClick={() => openNotes(it)}
                         >
-                            <div className="font-semibold">{it.title}</div>
+                            <div className="font-semibold uppercase">
+                                {it.title}
+                            </div>
                             <p className="mt-1 text-[12px] text-gray-700 whitespace-pre-line">
                                 {it.content}
                             </p>
