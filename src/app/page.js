@@ -19,8 +19,13 @@ async function createNote({ title, content }) {
 }
 
 // Ambil Catatan
-async function fetchNotes() {
-    const res = await fetch('/api/notes', {
+async function fetchNotes({ page, pageSize }) {
+    const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+    });
+
+    const res = await fetch(`/api/notes?${params.toString()}`, {
         cache: 'no-cache',
     });
 
@@ -76,10 +81,14 @@ export default function Home() {
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [confirmTargetDelete, setConfirmDeleteTarget] = useState('');
 
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
+
     const { mutateAsync: addNote, isPending: isSaving } = useMutation({
         mutationFn: createNote,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notes'] });
+            setPage(1);
         },
     });
 
@@ -135,8 +144,9 @@ export default function Home() {
     }
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ['notes'],
-        queryFn: fetchNotes,
+        queryKey: ['notes', page, pageSize],
+        queryFn: () => fetchNotes({ page, pageSize }),
+        keepPreviouseData: true,
     });
 
     function openNotes(it) {
@@ -575,7 +585,7 @@ export default function Home() {
 
                 {/* LIST NOTES */}
                 <ul className="text-sm grid gap-3">
-                    {(data ?? []).map((it) => (
+                    {(data?.items ?? []).map((it) => (
                         <li
                             key={it.id}
                             className={[
@@ -612,6 +622,48 @@ export default function Home() {
                         </li>
                     ))}
                 </ul>
+                {data && data.total > 0 && (
+                    <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+                        <span className="text-gray-500">
+                            Hal {data.page} dari{' '}
+                            {Math.max(1, Math.ceil(data.total / data.pageSize))}{' '}
+                            • {data.total} catatan
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setPage((p) => Math.max(1, p - 1))
+                                }
+                                disabled={page <= 1 || isLoading}
+                                className="rounded-md border px-3 py-1 disabled:opacity-50 hover:bg-gray-50 transition"
+                            >
+                                Prev
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const totalPages = Math.max(
+                                        1,
+                                        Math.ceil((data?.total ?? 0) / pageSize)
+                                    );
+                                    setPage((p) => Math.min(totalPages, p + 1));
+                                }}
+                                disabled={
+                                    isLoading ||
+                                    (data &&
+                                        page >=
+                                            Math.ceil(
+                                                data.total / data.pageSize
+                                            ))
+                                }
+                                className="rounded-md border px-3 py-1 disabled:opacity-50 hover:bg-gray-50 transition"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </section>
         </main>
     );
