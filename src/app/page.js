@@ -49,6 +49,19 @@ async function patchNotes({ id, title, content }) {
     return res.json();
 }
 
+// Delete Note
+async function deleteNotes(id) {
+    const res = await fetch(`/api/notes/${id}`, {
+        method: 'DELETE',
+    });
+
+    if (!res.ok) {
+        throw new Error('Gagal delete catatan!');
+    }
+
+    return res.json();
+}
+
 export default function Home() {
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
@@ -59,6 +72,9 @@ export default function Home() {
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState('');
     const [editContent, setEditContent] = useState('');
+
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [confirmTargetDelete, setConfirmDeleteTarget] = useState('');
 
     const { mutateAsync: addNote, isPending: isSaving } = useMutation({
         mutationFn: createNote,
@@ -73,6 +89,14 @@ export default function Home() {
             queryClient.invalidateQueries({ queryKey: ['notes'] });
             setSelected(updated);
             setIsEditing(false);
+        },
+    });
+
+    const { mutateAsync: removeNote, isPending: isDeleting } = useMutation({
+        mutationFn: deleteNotes,
+        onSuccess: (del) => {
+            queryClient.invalidateQueries({ queryKey: ['notes'] });
+            closeNotes();
         },
     });
 
@@ -147,6 +171,37 @@ export default function Home() {
             window.removeEventListener('keydown', onKey);
         };
     }, [openModal]);
+
+    useEffect(() => {
+        if (!confirmDeleteOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const onKey = (e) => {
+            if (e.key === 'Escape') closeConfirm();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => {
+            document.body.style.overflow = prev;
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [confirmDeleteOpen]);
+
+    function askDelete(id, title) {
+        setConfirmDeleteOpen(true);
+        setConfirmDeleteTarget({ id, title });
+    }
+
+    function closeConfirm() {
+        setConfirmDeleteOpen(false);
+        setConfirmDeleteTarget(null);
+    }
+
+    async function handleConfirmDelete() {
+        if (!confirmTargetDelete) return
+
+        await removeNote(selected.id)
+        closeConfirm()
+    }
 
     return (
         <main className="font-sans max-w-3xl mx-auto p-6">
@@ -234,11 +289,15 @@ export default function Home() {
                 </h2>
 
                 {isLoading && (
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-500 italic animate-pulse">
                         Sedang memuat catatan...
                     </p>
                 )}
-                {isError && <p>Gagal memuat catatan...</p>}
+                {isError && (
+                    <p className="text-sm text-red-500 italic">
+                        Gagal memuat catatan...
+                    </p>
+                )}
                 {!isLoading && Array.isArray(data) && data.length === 0 && (
                     <p className="text-gray-500 text-sm italic">
                         Tidak ditemukan catatan.
@@ -252,7 +311,7 @@ export default function Home() {
                         role="dialog"
                         aria-labelledby="note-title"
                         className={[
-                            'fixed inset-0 z-50 flex items-center justify-center p-',
+                            'fixed inset-0 z-40 flex items-center justify-center p-',
                             'bg-black/40 backdrop-blur-sm',
                         ].join(' ')}
                         onClick={(e) => {
@@ -282,7 +341,7 @@ export default function Home() {
                                 <button
                                     type="button"
                                     onClick={() => closeNotes()}
-                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
+                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition duration-300"
                                 >
                                     Esc
                                 </button>
@@ -294,10 +353,22 @@ export default function Home() {
                                         {selected.content}
                                     </div>
 
-                                    <div className="flex justify-end">
+                                    <div className="flex justify-between">
                                         <button
                                             type="button"
-                                            className="mt-4 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition"
+                                            className="mt-4 rounded-md bg-red-500 text-white border-gray-300 px-2 py-1 text-xs hover:bg-red-600 active:scale-90 transition duration-300"
+                                            onClick={() => {
+                                                askDelete(
+                                                    selected.id,
+                                                    selected.title
+                                                );
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="mt-4 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition duration-300"
                                             onClick={() => {
                                                 setIsEditing(true);
                                                 setEditTitle(selected.title);
@@ -399,7 +470,7 @@ export default function Home() {
                                     <div className="flex justify-between">
                                         <button
                                             type="button"
-                                            className="rounded-md border bg-black text-white border-gray-300 px-2 py-1 text-xs hover:bg-gray-700 active:scale-90 transition duration-300"
+                                            className="rounded-md bg-black text-white border-gray-300 px-2 py-1 text-xs hover:bg-gray-700 active:scale-90 transition duration-300"
                                             onClick={() => {
                                                 setIsEditing(false);
                                                 setEditTitle(selected.title);
@@ -437,6 +508,67 @@ export default function Home() {
                                     </div>
                                 </form>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {confirmDeleteOpen && confirmTargetDelete && (
+                    <div
+                        aria-modal="true"
+                        role="dialog"
+                        aria-labelledby="confirm-delete"
+                        className={[
+                            'fixed inset-0 z-50 flex items-center justify-center p-2',
+                            'bg-black/40 backdrop-blur-sm p-2',
+                        ].join(' ')}
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) {
+                                closeConfirm();
+                            }
+                        }}
+                    >
+                        <div
+                            className={[
+                                'flex flex-col space-y-3 bg-white max-w-lg rounded-md border border-gray-300',
+                                'shadow-md p-5',
+                            ].join(' ')}
+                            role="document"
+                        >
+                            <div className="flex justify-between gap-10 items-center">
+                                <h4 className="font-semibold text-sm font-pixel uppercase">
+                                    Hapus Catatan?
+                                </h4>
+                                <button
+                                    type="button"
+                                    onClick={() => closeConfirm()}
+                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition duration-300"
+                                >
+                                    Esc
+                                </button>
+                            </div>
+                            <p className="mt-2 text-sm">
+                                Yakin nih, dihapus? 🤔
+                            </p>
+
+                            <div className="mt-4 flex justify-between">
+                                <button
+                                    type="button"
+                                    className="rounded-md bg-black text-white border-gray-300 px-2 py-1 text-xs hover:bg-gray-700 active:scale-90 transition duration-300"
+                                    onClick={() => {
+                                        closeConfirm();
+                                    }}
+                                >
+                                    G Jadi
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100 active:scale-90 transition duration-300 disabled:opacity-60"
+                                    disabled={isDeleting}
+                                    onClick={handleConfirmDelete}
+                                >
+                                    {isDeleting ? 'Menghapus...' : 'Jadi'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

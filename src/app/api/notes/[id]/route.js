@@ -46,3 +46,43 @@ export async function PATCH(_req, { params }) {
         );
     }
 }
+
+// delete note
+export async function DELETE(_req, { params }) {
+    const { id } = await params;
+
+    if (!id) {
+        return NextResponse.json(
+            {
+                error: 'id wajib',
+            },
+            { statu: 400 }
+        );
+    }
+
+    try {
+        const del = `delete from notes where id = $1 returning *;`;
+
+        const { rows } = await pool.query(del, [id]);
+
+        if (rows.length === 0) {
+            return NextResponse.json(
+                { error: 'Note tidak ditemukan!' },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                ok: true,
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        console.error('Gagal hapus note: ', error);
+        return NextResponse.json(
+            { error: 'Gagal hapus note' },
+            { status: 500 }
+        );
+    }
+}
