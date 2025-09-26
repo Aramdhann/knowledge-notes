@@ -197,10 +197,10 @@ export default function Home() {
     }
 
     async function handleConfirmDelete() {
-        if (!confirmTargetDelete) return
+        if (!confirmTargetDelete) return;
 
-        await removeNote(selected.id)
-        closeConfirm()
+        await removeNote(selected.id);
+        closeConfirm();
     }
 
     return (
@@ -311,7 +311,7 @@ export default function Home() {
                         role="dialog"
                         aria-labelledby="note-title"
                         className={[
-                            'fixed inset-0 z-40 flex items-center justify-center p-',
+                            'fixed inset-0 z-40 flex items-center justify-center p-2',
                             'bg-black/40 backdrop-blur-sm',
                         ].join(' ')}
                         onClick={(e) => {
@@ -324,7 +324,7 @@ export default function Home() {
                         <div
                             className={[
                                 'bg-white max-w-lg rounded-md border border-gray-300',
-                                'shadow-md p-5',
+                                'shadow-md p-5 max-h-[85vh] overflow-hidden flex flex-col',
                             ].join(' ')}
                             role="document"
                         >
@@ -349,7 +349,7 @@ export default function Home() {
 
                             {!isEditing ? (
                                 <>
-                                    <div className="mt-4 text-sm text-gray-700 whitespace-pre-line">
+                                    <div className="mt-4 text-sm text-gray-700 whitespace-pre-line flex-1 overflow-y-auto overscroll-contain">
                                         {selected.content}
                                     </div>
 
@@ -586,12 +586,15 @@ export default function Home() {
                             ].join(' ')}
                             onClick={() => openNotes(it)}
                         >
-                            <div className="font-semibold uppercase">
+                            <div className="font-semibold uppercase clamp-1">
                                 {it.title}
                             </div>
-                            <p className="mt-1 text-[12px] text-gray-700 whitespace-pre-line">
-                                {it.content}
-                            </p>
+                            <div className="mt-1 flex-1 overflow-hidden">
+                                <p className="text-[12px] text-gray-700 whitespace-pre-line clamp-4">
+                                    {it.content}
+                                </p>
+                            </div>
+
                             <div className="mt-2 text-xs text-gray-400">
                                 {it.created_at &&
                                     `Dibuat: ${new Date(
