@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 // update notes
 export async function PATCH(_req, { params }) {
-    const id = params?.id;
+    const { id } = await params;
 
     if (!id) {
         return NextResponse.json(
